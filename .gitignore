@@ -23,6 +23,9 @@ mlruns/
 *.parquet
 *.csv
 
+# Foundry generated deployment output (casting.yaml + casting.yaml.lock ARE committed; pours/ is not)
+pours/
+
 # OS / editor
 .DS_Store
 .idea/
