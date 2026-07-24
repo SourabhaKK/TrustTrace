@@ -69,9 +69,38 @@ curl -XPOST localhost:8000/classify -H 'content-type: application/json' -d '{"te
 Then confirm in the SigNoz UI (Traces view) that service `trusttrace` shows the
 `trusttrace.test_trace` span and a `trace.classify` span for the request.
 
+### Ground-truth verification (don't trust "it ran" / "ready" logs)
+
+A successful OTLP export or a collector `"Everything is ready"` log does NOT prove a trace
+was stored. Verify against ClickHouse directly (inside the WSL2 host where SigNoz runs):
+
+```bash
+docker exec signoz-telemetrystore-clickhouse-0-0 clickhouse-client --param_svc=trusttrace -q \
+  "SELECT serviceName, name, count() FROM signoz_traces.distributed_signoz_index_v3 \
+   WHERE serviceName = {svc:String} AND timestamp > now() - INTERVAL 15 MINUTE \
+   GROUP BY serviceName, name FORMAT PrettyCompact"
+```
+(Use `{svc:String}` bound params — ClickHouse treats `"double quotes"` as identifiers, not string literals.)
+
+### Troubleshooting: OTLP connections reset / no traces land
+
+If `4317`/`4318` reset every connection (from host, WSL2, *and* in-network) and ClickHouse
+shows 0 rows, check the OPAMP handshake:
+
+```bash
+docker logs signoz-signoz-0   2>&1 | grep "cannot create agent without orgId"
+docker logs signoz-ingester-1 2>&1 | grep "Server returned an error"
+```
+
+`cannot create agent without orgId` means **SigNoz first-run onboarding (create admin
+account → organization) has not been completed**. Until it is, the server refuses to
+register the otel-collector over OPAMP, so the collector never gets a pipeline config and
+its OTLP receivers reject all traffic. Fix: complete onboarding at http://localhost:8080,
+then re-send. (Observed and resolved 2026-07-24.)
+
 ## Status
 
-- Done: OTel tracing foundation, test-trace tool, instrumented FastAPI stub (locally
-  verified — 42 tests pass; console shows `trace.classify`).
-- Pending (needs the WSL2 Foundry backend): install, commit `casting.yaml`/lock, and the
-  live "trace lands in SigNoz" confirmation of items 3 & 4.
+Phase 2 COMPLETE (2026-07-24). SigNoz installed via Foundry (WSL2), `casting.yaml`/lock
+committed, and traces confirmed landing in SigNoz (ClickHouse ground-truth + UI) for both
+`send_test_trace` and the instrumented FastAPI `/classify` stub. OTLP endpoint:
+`http://localhost:4317` (gRPC). Next: Phase 3 (fine-tuning) / Phase 5 (real metrics + spans).
