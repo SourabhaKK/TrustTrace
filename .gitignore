@@ -23,8 +23,8 @@ mlruns/
 *.parquet
 *.csv
 
-# Foundry generated deployment output (casting.yaml + casting.yaml.lock ARE committed; pours/ is not)
-pours/
+# Foundry deployment artifacts (casting.yaml, casting.yaml.lock, pours/) ARE committed
+# as the graded reproducibility artifact (FR7) — judges re-run Foundry against them.
 
 # OS / editor
 .DS_Store
