@@ -14,7 +14,7 @@ import logging
 import pandas as pd
 
 from trusttrace.data.load import LABEL_COLUMNS, load_jigsaw
-from trusttrace.schema import Category, map_labels_to_category
+from trusttrace.schema import Category, derive_severity, map_labels_to_category
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +29,15 @@ def add_category(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df["category"] = df[LABEL_COLUMNS].apply(
         lambda row: map_labels_to_category(row.to_dict()).value, axis=1
+    )
+    return df
+
+
+def add_schema_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Add both ``category`` and derived ``severity`` columns (str enum values)."""
+    df = add_category(df)
+    df["severity"] = df["category"].apply(
+        lambda c: derive_severity(Category(c)).value
     )
     return df
 
