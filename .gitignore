@@ -25,6 +25,8 @@ mlruns/
 
 # Foundry deployment artifacts (casting.yaml, casting.yaml.lock, pours/) ARE committed
 # as the graded reproducibility artifact (FR7) — judges re-run Foundry against them.
+# Foundry also drops an examples/ tree during install — not part of this repo.
+docs/examples/
 
 # OS / editor
 .DS_Store
