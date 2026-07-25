@@ -1,118 +1,117 @@
 {
   "title": "TrustTrace — Canary (base vs fine-tuned)",
-  "description": "Dual-model canary observability: per-path inference latency, token cost, schema-validity rate, and the base-vs-fine-tuned quality delta. Import via SigNoz UI -> Dashboards -> New -> Import JSON.",
+  "description": "Dual-model canary observability: per-path inference latency, token cost, schema-validity rate, and the base-vs-fine-tuned quality delta. Histogram averages are computed as rate(metric.sum)/rate(metric.count) (SigNoz stores histograms decomposed). Import via SigNoz UI -> Dashboards -> New -> Import JSON.",
   "tags": ["trusttrace", "canary", "hackathon"],
+  "version": "v5",
   "variables": {},
+  "panelMap": {},
+  "uploadedGrafana": false,
+  "layout": [
+    {"h": 6, "i": "quality-delta", "moved": false, "static": false, "w": 6, "x": 6, "y": 0},
+    {"h": 6, "i": "schema-validity", "moved": false, "static": false, "w": 6, "x": 0, "y": 0},
+    {"h": 6, "i": "latency", "moved": false, "static": false, "w": 6, "x": 0, "y": 6},
+    {"h": 6, "i": "tokens", "moved": false, "static": false, "w": 6, "x": 6, "y": 6}
+  ],
   "widgets": [
-    {
-      "id": "latency-by-path",
-      "title": "Inference latency (ms) — base vs fine-tuned",
-      "description": "avg trusttrace.inference.latency_ms grouped by path",
-      "panelTypes": "graph",
-      "query": {
-        "queryType": "builder",
-        "builder": {
-          "queryData": [
-            {
-              "queryName": "A",
-              "dataSource": "metrics",
-              "aggregateAttribute": {"key": "trusttrace.inference.latency_ms", "dataType": "float64", "type": "Histogram", "isColumn": true},
-              "aggregateOperator": "avg",
-              "timeAggregation": "avg",
-              "spaceAggregation": "avg",
-              "groupBy": [{"key": "path", "dataType": "string", "type": "tag"}],
-              "expression": "A",
-              "legend": "{{path}}",
-              "disabled": false,
-              "reduceTo": "avg"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "tokens-by-path",
-      "title": "Token cost — generated tokens by path",
-      "description": "sum trusttrace.tokens.total grouped by path",
-      "panelTypes": "graph",
-      "query": {
-        "queryType": "builder",
-        "builder": {
-          "queryData": [
-            {
-              "queryName": "A",
-              "dataSource": "metrics",
-              "aggregateAttribute": {"key": "trusttrace.tokens.total", "dataType": "float64", "type": "Histogram", "isColumn": true},
-              "aggregateOperator": "sum",
-              "timeAggregation": "sum",
-              "spaceAggregation": "sum",
-              "groupBy": [{"key": "path", "dataType": "string", "type": "tag"}],
-              "expression": "A",
-              "legend": "{{path}}",
-              "disabled": false,
-              "reduceTo": "sum"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "schema-validity-by-path",
-      "title": "Schema-validity rate — base vs fine-tuned",
-      "description": "avg trusttrace.schema.valid_rate (0/1) grouped by path = validity rate",
-      "panelTypes": "graph",
-      "query": {
-        "queryType": "builder",
-        "builder": {
-          "queryData": [
-            {
-              "queryName": "A",
-              "dataSource": "metrics",
-              "aggregateAttribute": {"key": "trusttrace.schema.valid_rate", "dataType": "float64", "type": "Histogram", "isColumn": true},
-              "aggregateOperator": "avg",
-              "timeAggregation": "avg",
-              "spaceAggregation": "avg",
-              "groupBy": [{"key": "path", "dataType": "string", "type": "tag"}],
-              "expression": "A",
-              "legend": "{{path}}",
-              "disabled": false,
-              "reduceTo": "avg"
-            }
-          ]
-        }
-      }
-    },
     {
       "id": "quality-delta",
       "title": "Quality delta (fine-tuned − base)  [alert metric]",
-      "description": "avg trusttrace.quality_delta. Healthy ~ +0.86; alert fires when avg over 5m < -0.10.",
+      "description": "avg quality_delta = rate(sum)/rate(count). Healthy ~ +1.0; alert fires when avg over 5m < -0.10.",
       "panelTypes": "graph",
+      "yAxisUnit": "none",
+      "fillSpans": false,
+      "softMin": 0,
+      "softMax": 0,
+      "decimalPrecision": 2,
+      "nullZeroValues": "zero",
+      "thresholds": [],
       "query": {
         "queryType": "builder",
+        "unit": "",
         "builder": {
           "queryData": [
-            {
-              "queryName": "A",
-              "dataSource": "metrics",
-              "aggregateAttribute": {"key": "trusttrace.quality_delta", "dataType": "float64", "type": "Histogram", "isColumn": true},
-              "aggregateOperator": "avg",
-              "timeAggregation": "avg",
-              "spaceAggregation": "avg",
-              "groupBy": [],
-              "expression": "A",
-              "legend": "quality_delta",
-              "disabled": false,
-              "reduceTo": "avg"
-            }
-          ]
+            {"aggregations": [{"metricName": "trusttrace.quality_delta.sum", "reduceTo": "sum", "spaceAggregation": "sum", "temporality": "", "timeAggregation": "rate"}], "dataSource": "metrics", "disabled": true, "expression": "A", "filter": {"expression": ""}, "functions": [], "groupBy": [], "having": {"expression": ""}, "legend": "", "limit": null, "orderBy": [], "queryName": "A", "source": "", "stepInterval": null},
+            {"aggregations": [{"metricName": "trusttrace.quality_delta.count", "reduceTo": "sum", "spaceAggregation": "sum", "temporality": "", "timeAggregation": "rate"}], "dataSource": "metrics", "disabled": true, "expression": "B", "filter": {"expression": ""}, "functions": [], "groupBy": [], "having": {"expression": ""}, "legend": "", "limit": null, "orderBy": [], "queryName": "B", "source": "", "stepInterval": null}
+          ],
+          "queryFormulas": [{"disabled": false, "expression": "A/B", "legend": "quality_delta", "queryName": "F1"}],
+          "queryTraceOperator": []
+        }
+      }
+    },
+    {
+      "id": "schema-validity",
+      "title": "Schema-validity rate — base vs fine-tuned",
+      "description": "validity rate per path = rate(schema.valid_rate.sum)/rate(count). base ~0, fine-tuned ~1.0.",
+      "panelTypes": "graph",
+      "yAxisUnit": "none",
+      "fillSpans": false,
+      "softMin": 0,
+      "softMax": 0,
+      "decimalPrecision": 2,
+      "nullZeroValues": "zero",
+      "thresholds": [],
+      "query": {
+        "queryType": "builder",
+        "unit": "",
+        "builder": {
+          "queryData": [
+            {"aggregations": [{"metricName": "trusttrace.schema.valid_rate.sum", "reduceTo": "sum", "spaceAggregation": "sum", "temporality": "", "timeAggregation": "rate"}], "dataSource": "metrics", "disabled": true, "expression": "A", "filter": {"expression": ""}, "functions": [], "groupBy": [{"dataType": "string", "key": "path", "type": "tag"}], "having": {"expression": ""}, "legend": "", "limit": null, "orderBy": [], "queryName": "A", "source": "", "stepInterval": null},
+            {"aggregations": [{"metricName": "trusttrace.schema.valid_rate.count", "reduceTo": "sum", "spaceAggregation": "sum", "temporality": "", "timeAggregation": "rate"}], "dataSource": "metrics", "disabled": true, "expression": "B", "filter": {"expression": ""}, "functions": [], "groupBy": [{"dataType": "string", "key": "path", "type": "tag"}], "having": {"expression": ""}, "legend": "", "limit": null, "orderBy": [], "queryName": "B", "source": "", "stepInterval": null}
+          ],
+          "queryFormulas": [{"disabled": false, "expression": "A/B", "legend": "{{path}}", "queryName": "F1"}],
+          "queryTraceOperator": []
+        }
+      }
+    },
+    {
+      "id": "latency",
+      "title": "Inference latency (ms) — base vs fine-tuned",
+      "description": "avg latency per path (ms) = rate(inference.latency_ms.sum)/rate(count).",
+      "panelTypes": "graph",
+      "yAxisUnit": "none",
+      "fillSpans": false,
+      "softMin": 0,
+      "softMax": 0,
+      "decimalPrecision": 2,
+      "nullZeroValues": "zero",
+      "thresholds": [],
+      "query": {
+        "queryType": "builder",
+        "unit": "",
+        "builder": {
+          "queryData": [
+            {"aggregations": [{"metricName": "trusttrace.inference.latency_ms.sum", "reduceTo": "sum", "spaceAggregation": "sum", "temporality": "", "timeAggregation": "rate"}], "dataSource": "metrics", "disabled": true, "expression": "A", "filter": {"expression": ""}, "functions": [], "groupBy": [{"dataType": "string", "key": "path", "type": "tag"}], "having": {"expression": ""}, "legend": "", "limit": null, "orderBy": [], "queryName": "A", "source": "", "stepInterval": null},
+            {"aggregations": [{"metricName": "trusttrace.inference.latency_ms.count", "reduceTo": "sum", "spaceAggregation": "sum", "temporality": "", "timeAggregation": "rate"}], "dataSource": "metrics", "disabled": true, "expression": "B", "filter": {"expression": ""}, "functions": [], "groupBy": [{"dataType": "string", "key": "path", "type": "tag"}], "having": {"expression": ""}, "legend": "", "limit": null, "orderBy": [], "queryName": "B", "source": "", "stepInterval": null}
+          ],
+          "queryFormulas": [{"disabled": false, "expression": "A/B", "legend": "{{path}}", "queryName": "F1"}],
+          "queryTraceOperator": []
+        }
+      }
+    },
+    {
+      "id": "tokens",
+      "title": "Token cost — avg generated tokens/request by path",
+      "description": "avg generated tokens per request per path = rate(tokens.total.sum)/rate(count).",
+      "panelTypes": "graph",
+      "yAxisUnit": "none",
+      "fillSpans": false,
+      "softMin": 0,
+      "softMax": 0,
+      "decimalPrecision": 2,
+      "nullZeroValues": "zero",
+      "thresholds": [],
+      "query": {
+        "queryType": "builder",
+        "unit": "",
+        "builder": {
+          "queryData": [
+            {"aggregations": [{"metricName": "trusttrace.tokens.total.sum", "reduceTo": "sum", "spaceAggregation": "sum", "temporality": "", "timeAggregation": "rate"}], "dataSource": "metrics", "disabled": true, "expression": "A", "filter": {"expression": ""}, "functions": [], "groupBy": [{"dataType": "string", "key": "path", "type": "tag"}], "having": {"expression": ""}, "legend": "", "limit": null, "orderBy": [], "queryName": "A", "source": "", "stepInterval": null},
+            {"aggregations": [{"metricName": "trusttrace.tokens.total.count", "reduceTo": "sum", "spaceAggregation": "sum", "temporality": "", "timeAggregation": "rate"}], "dataSource": "metrics", "disabled": true, "expression": "B", "filter": {"expression": ""}, "functions": [], "groupBy": [{"dataType": "string", "key": "path", "type": "tag"}], "having": {"expression": ""}, "legend": "", "limit": null, "orderBy": [], "queryName": "B", "source": "", "stepInterval": null}
+          ],
+          "queryFormulas": [{"disabled": false, "expression": "A/B", "legend": "{{path}}", "queryName": "F1"}],
+          "queryTraceOperator": []
         }
       }
     }
-  ],
-  "layout": [
-    {"i": "latency-by-path", "x": 0, "y": 0, "w": 6, "h": 3},
-    {"i": "tokens-by-path", "x": 6, "y": 0, "w": 6, "h": 3},
-    {"i": "schema-validity-by-path", "x": 0, "y": 3, "w": 6, "h": 3},
-    {"i": "quality-delta", "x": 6, "y": 3, "w": 6, "h": 3}
   ]
 }
