@@ -80,21 +80,38 @@ class DualClassifier:
         return self.tokenizer.decode(new, skip_special_tokens=True)
 
     def _infer_both(self, prompt: str) -> tuple[str, str]:
-        """Generate both paths under the lock (no adapter-state races across requests)."""
+        """Generate both paths under the lock (no adapter-state races across requests).
+
+        Emits per-path child spans (infer.finetuned / infer.base) for the PRD §11.4 trace
+        structure. Latency/token-cost METRICS on these spans are Phase 5.
+        """
+        from trusttrace.observability.otel import get_tracer
+
+        tracer = get_tracer("trusttrace.serving")
         with self._lock:
-            ft_text = self._generate_text(prompt)          # adapter enabled -> fine-tuned
-            with self.model.disable_adapter():             # base path
-                base_text = self._generate_text(prompt)
+            with tracer.start_as_current_span("infer.finetuned") as span:
+                span.set_attribute("path", "finetuned")
+                ft_text = self._generate_text(prompt)      # adapter enabled -> fine-tuned
+            with tracer.start_as_current_span("infer.base") as span:
+                span.set_attribute("path", "base")
+                with self.model.disable_adapter():         # base path
+                    base_text = self._generate_text(prompt)
         return ft_text, base_text
 
     def classify(self, text: str) -> DualResult:
         """Classify one input through both paths; returns parsed structured results."""
+        from trusttrace.observability.otel import get_tracer
+
         prompt = render_for_inference(self.tokenizer, text, self.max_len)
         ft_text, base_text = self._infer_both(prompt)
-        return DualResult(
-            finetuned=parse_classification(ft_text),
-            base=parse_classification(base_text),
-        )
+        with get_tracer("trusttrace.serving").start_as_current_span("validate.schema") as span:
+            result = DualResult(
+                finetuned=parse_classification(ft_text),
+                base=parse_classification(base_text),
+            )
+            span.set_attribute("finetuned.schema_valid", result.finetuned.schema_valid)
+            span.set_attribute("base.schema_valid", result.base.schema_valid)
+        return result
 
 
 _singleton: DualClassifier | None = None

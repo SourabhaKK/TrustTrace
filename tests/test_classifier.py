@@ -8,12 +8,15 @@ proves the lock does its job and that the test actually bites.
 from __future__ import annotations
 
 import contextlib
+import os
 import threading
 import time
 
-import torch
+os.environ["OTEL_DISABLE_OTLP"] = "1"  # spans go nowhere; this test is about the lock
 
-from trusttrace.serving.classifier import DualClassifier
+import torch  # noqa: E402
+
+from trusttrace.serving.classifier import DualClassifier  # noqa: E402
 
 _FAKE_JSON = '{"category": "none", "severity": "none", "confidence": 1.0}'
 
