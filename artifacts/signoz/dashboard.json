@@ -1,0 +1,118 @@
+{
+  "title": "TrustTrace — Canary (base vs fine-tuned)",
+  "description": "Dual-model canary observability: per-path inference latency, token cost, schema-validity rate, and the base-vs-fine-tuned quality delta. Import via SigNoz UI -> Dashboards -> New -> Import JSON.",
+  "tags": ["trusttrace", "canary", "hackathon"],
+  "variables": {},
+  "widgets": [
+    {
+      "id": "latency-by-path",
+      "title": "Inference latency (ms) — base vs fine-tuned",
+      "description": "avg trusttrace.inference.latency_ms grouped by path",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "queryName": "A",
+              "dataSource": "metrics",
+              "aggregateAttribute": {"key": "trusttrace.inference.latency_ms", "dataType": "float64", "type": "Histogram", "isColumn": true},
+              "aggregateOperator": "avg",
+              "timeAggregation": "avg",
+              "spaceAggregation": "avg",
+              "groupBy": [{"key": "path", "dataType": "string", "type": "tag"}],
+              "expression": "A",
+              "legend": "{{path}}",
+              "disabled": false,
+              "reduceTo": "avg"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tokens-by-path",
+      "title": "Token cost — generated tokens by path",
+      "description": "sum trusttrace.tokens.total grouped by path",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "queryName": "A",
+              "dataSource": "metrics",
+              "aggregateAttribute": {"key": "trusttrace.tokens.total", "dataType": "float64", "type": "Histogram", "isColumn": true},
+              "aggregateOperator": "sum",
+              "timeAggregation": "sum",
+              "spaceAggregation": "sum",
+              "groupBy": [{"key": "path", "dataType": "string", "type": "tag"}],
+              "expression": "A",
+              "legend": "{{path}}",
+              "disabled": false,
+              "reduceTo": "sum"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "schema-validity-by-path",
+      "title": "Schema-validity rate — base vs fine-tuned",
+      "description": "avg trusttrace.schema.valid_rate (0/1) grouped by path = validity rate",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "queryName": "A",
+              "dataSource": "metrics",
+              "aggregateAttribute": {"key": "trusttrace.schema.valid_rate", "dataType": "float64", "type": "Histogram", "isColumn": true},
+              "aggregateOperator": "avg",
+              "timeAggregation": "avg",
+              "spaceAggregation": "avg",
+              "groupBy": [{"key": "path", "dataType": "string", "type": "tag"}],
+              "expression": "A",
+              "legend": "{{path}}",
+              "disabled": false,
+              "reduceTo": "avg"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "quality-delta",
+      "title": "Quality delta (fine-tuned − base)  [alert metric]",
+      "description": "avg trusttrace.quality_delta. Healthy ~ +0.86; alert fires when avg over 5m < -0.10.",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "queryName": "A",
+              "dataSource": "metrics",
+              "aggregateAttribute": {"key": "trusttrace.quality_delta", "dataType": "float64", "type": "Histogram", "isColumn": true},
+              "aggregateOperator": "avg",
+              "timeAggregation": "avg",
+              "spaceAggregation": "avg",
+              "groupBy": [],
+              "expression": "A",
+              "legend": "quality_delta",
+              "disabled": false,
+              "reduceTo": "avg"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "layout": [
+    {"i": "latency-by-path", "x": 0, "y": 0, "w": 6, "h": 3},
+    {"i": "tokens-by-path", "x": 6, "y": 0, "w": 6, "h": 3},
+    {"i": "schema-validity-by-path", "x": 0, "y": 3, "w": 6, "h": 3},
+    {"i": "quality-delta", "x": 6, "y": 3, "w": 6, "h": 3}
+  ]
+}

@@ -98,6 +98,48 @@ register the otel-collector over OPAMP, so the collector never gets a pipeline c
 its OTLP receivers reject all traffic. Fix: complete onboarding at http://localhost:8080,
 then re-send. (Observed and resolved 2026-07-24.)
 
+## Custom canary metrics (Phase 5)
+
+Recorded per request in `serving/classifier.py` and exported to SigNoz via OTLP (defined in
+`observability/metrics.py`). All are Histograms; windowed aggregation happens in SigNoz.
+Attributes are `path` + numeric values only — never raw text or per-request category values.
+
+| Metric | Tags | Meaning / aggregation |
+|---|---|---|
+| `trusttrace.inference.latency_ms` | `path=base\|finetuned` | per-path generation latency (avg / p95) |
+| `trusttrace.tokens.total` | `path=base\|finetuned` | per-path generated-token count (sum = token cost) |
+| `trusttrace.schema.valid_rate` | `path=base\|finetuned` | 0/1 per request; **avg = schema-validity rate** |
+| `trusttrace.quality_delta` | — | `finetuned_valid(0/1) − base_valid(0/1)` per request; **avg = validity-rate delta** |
+
+**Quality-delta definition.** There is no ground truth at serving time and `confidence` is a
+fixed 1.0 (see Known Limitations), so quality is measured by **schema-validity**:
+`quality_delta = finetuned_schema_valid − base_schema_valid`. Healthy traffic sits near
+**+0.86** (fine-tuned ~1.0 valid, base ~0.14). When the fine-tuned path degrades, the delta
+falls — the alert signal.
+
+### Dashboard + alert (import in the SigNoz UI)
+
+Config lives in `artifacts/signoz/`:
+- **`dashboard.json`** — 4 panels (latency, token cost, schema-validity rate, quality-delta),
+  base vs fine-tuned. Import: SigNoz UI → Dashboards → New → *Import JSON*.
+- **`alert.json`** — fires when **`avg(trusttrace.quality_delta)` over 5m < −0.10** (i.e.
+  fine-tuned schema-validity >10pp below base; PRD §11.4). Import: Alerts → New → import / or
+  recreate the threshold rule with these values.
+
+> These are authored to SigNoz's import format but were not import-tested here (SigNoz was down
+> during authoring); verify/tweak fields in the UI on import. The metric names + the
+> quality-delta threshold above are the authoritative spec.
+
+### Verifying metrics land (ClickHouse ground-truth)
+
+```bash
+docker exec signoz-telemetrystore-clickhouse-0-0 clickhouse-client -q \
+  "SELECT DISTINCT metric_name FROM signoz_metrics.distributed_samples_v4 \
+   WHERE metric_name LIKE 'trusttrace.%' FORMAT PrettyCompact"
+```
+(Table name may vary by SigNoz version — e.g. `samples_v4` / `distributed_samples_v4`; list
+`SHOW TABLES FROM signoz_metrics` if needed.)
+
 ## Known limitations
 
 - **Confidence is not calibrated (as of Phase 3).** The fine-tuned classifier emits a

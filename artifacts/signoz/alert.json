@@ -1,0 +1,40 @@
+{
+  "alert": "TrustTrace canary — fine-tuned quality regression",
+  "alertType": "METRIC_BASED_ALERT",
+  "description": "Fires when the fine-tuned path's schema-validity drops more than 10 percentage points below the base path's, i.e. avg(trusttrace.quality_delta) over 5m falls below -0.10. Healthy traffic sits near +0.86. (PRD §11.4)",
+  "ruleType": "threshold_rule",
+  "evalWindow": "5m0s",
+  "frequency": "1m0s",
+  "condition": {
+    "compositeQuery": {
+      "queryType": "builder",
+      "panelType": "graph",
+      "builder": {
+        "queryData": [
+          {
+            "queryName": "A",
+            "dataSource": "metrics",
+            "aggregateAttribute": {"key": "trusttrace.quality_delta", "dataType": "float64", "type": "Histogram", "isColumn": true},
+            "aggregateOperator": "avg",
+            "timeAggregation": "avg",
+            "spaceAggregation": "avg",
+            "groupBy": [],
+            "expression": "A",
+            "legend": "quality_delta",
+            "disabled": false,
+            "reduceTo": "avg"
+          }
+        ]
+      }
+    },
+    "op": "below",
+    "target": -0.1,
+    "matchType": "atleastonce",
+    "targetUnit": ""
+  },
+  "labels": {"severity": "critical", "service": "trusttrace"},
+  "annotations": {
+    "summary": "Fine-tuned canary quality-delta below threshold",
+    "description": "avg(trusttrace.quality_delta) over 5m < -0.10 — the fine-tuned path is failing schema validity relative to base. Investigate / roll back the adapter."
+  }
+}
