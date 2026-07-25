@@ -15,8 +15,14 @@ from __future__ import annotations
 import logging
 import os
 
-from opentelemetry import trace
+from opentelemetry import metrics, trace
+from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import (
+    ConsoleMetricExporter,
+    PeriodicExportingMetricReader,
+)
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import (
@@ -33,6 +39,7 @@ SERVICE_NAME = "trusttrace"
 DEFAULT_OTLP_ENDPOINT = "http://localhost:4317"
 
 _provider: TracerProvider | None = None
+_meter_provider: MeterProvider | None = None
 
 
 def _truthy(value: str | None) -> bool:
@@ -85,3 +92,48 @@ def instrument_fastapi(app) -> None:
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
     FastAPIInstrumentor.instrument_app(app, tracer_provider=configure_tracing())
+
+
+def configure_metrics(service_name: str = SERVICE_NAME) -> MeterProvider:
+    """Install a global ``MeterProvider`` exporting metrics to SigNoz via OTLP.
+
+    Idempotent (mirrors ``configure_tracing``). Respects the same env toggles:
+    ``OTEL_EXPORTER_OTLP_ENDPOINT``, ``OTEL_DISABLE_OTLP``, ``OTEL_CONSOLE_EXPORT``.
+    """
+    global _meter_provider
+    if _meter_provider is not None:
+        return _meter_provider
+
+    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", DEFAULT_OTLP_ENDPOINT)
+    resource = Resource.create(
+        {
+            "service.name": service_name,
+            "service.version": __version__,
+            "deployment.environment": os.getenv("OTEL_ENV", "local"),
+        }
+    )
+    readers = []
+    if not _truthy(os.getenv("OTEL_DISABLE_OTLP")):
+        insecure = not endpoint.lower().startswith("https")
+        readers.append(
+            PeriodicExportingMetricReader(
+                OTLPMetricExporter(endpoint=endpoint, insecure=insecure),
+                export_interval_millis=5000,
+            )
+        )
+        log.info("OTLP metric export -> %s (insecure=%s)", endpoint, insecure)
+    if _truthy(os.getenv("OTEL_CONSOLE_EXPORT")):
+        readers.append(
+            PeriodicExportingMetricReader(ConsoleMetricExporter(), export_interval_millis=2000)
+        )
+
+    provider = MeterProvider(resource=resource, metric_readers=readers)
+    metrics.set_meter_provider(provider)
+    _meter_provider = provider
+    return provider
+
+
+def get_meter(name: str = SERVICE_NAME):
+    """Return a meter, configuring metrics on first use."""
+    configure_metrics()
+    return metrics.get_meter(name)
