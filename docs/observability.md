@@ -98,6 +98,17 @@ register the otel-collector over OPAMP, so the collector never gets a pipeline c
 its OTLP receivers reject all traffic. Fix: complete onboarding at http://localhost:8080,
 then re-send. (Observed and resolved 2026-07-24.)
 
+## Known limitations
+
+- **Confidence is not calibrated (as of Phase 3).** The fine-tuned classifier emits a
+  `confidence` field, but training targets fix `confidence = 1.0` (the ground-truth label is
+  certain), so the model learns to report high confidence regardless of true uncertainty.
+  Phase 3 therefore evaluates only **schema-validity + category accuracy/F1**, not confidence
+  calibration. Real calibration (deriving confidence from the model's token logprobs rather
+  than a trained constant) is a **Phase 5** enhancement. This is recorded here from the start
+  so the README/demo narrative states it as a known limitation rather than reconstructing it
+  later. Any confidence-based SigNoz alert (PRD §11.4) must account for this until Phase 5.
+
 ## Status
 
 Phase 2 COMPLETE (2026-07-24). SigNoz installed via Foundry (WSL2), `casting.yaml`/lock
