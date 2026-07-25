@@ -14,12 +14,13 @@ from fastapi import Depends, FastAPI
 from pydantic import BaseModel, Field
 
 from trusttrace import __version__
-from trusttrace.observability.otel import get_tracer, instrument_fastapi
+from trusttrace.observability.otel import configure_metrics, get_tracer, instrument_fastapi
 from trusttrace.schema import ClassificationOutput
 from trusttrace.serving.classifier import DualClassifier, get_classifier
 
 app = FastAPI(title="TrustTrace", version=__version__)
 instrument_fastapi(app)
+configure_metrics()  # install the OTLP MeterProvider for the custom canary metrics
 tracer = get_tracer("trusttrace.serving")
 
 

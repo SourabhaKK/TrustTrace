@@ -16,6 +16,7 @@ returned or logged.
 from __future__ import annotations
 
 import threading
+import time
 from dataclasses import dataclass
 
 import torch
@@ -67,7 +68,7 @@ class DualClassifier:
         return cls(model, tokenizer, device="cuda", **kwargs)
 
     @torch.no_grad()
-    def _generate_text(self, prompt: str) -> str:
+    def _generate_text(self, prompt: str) -> tuple[str, int]:
         enc = self.tokenizer(prompt, return_tensors="pt", add_special_tokens=False)
         enc = {k: v.to(self.device) for k, v in enc.items()}
         gen = self.model.generate(
@@ -77,13 +78,22 @@ class DualClassifier:
             pad_token_id=self.tokenizer.pad_token_id,
         )
         new = gen[0, enc["input_ids"].shape[1] :]
-        return self.tokenizer.decode(new, skip_special_tokens=True)
+        return self.tokenizer.decode(new, skip_special_tokens=True), int(new.shape[0])
 
-    def _infer_both(self, prompt: str) -> tuple[str, str]:
+    def _run_path(self, prompt: str, span) -> tuple[str, float, int]:
+        """Generate one path, timing it; annotate the span with latency/token cost."""
+        t0 = time.perf_counter()
+        text, n_tokens = self._generate_text(prompt)
+        latency_ms = (time.perf_counter() - t0) * 1000.0
+        span.set_attribute("inference.latency_ms", latency_ms)
+        span.set_attribute("tokens", n_tokens)
+        return text, latency_ms, n_tokens
+
+    def _infer_both(self, prompt: str) -> tuple[tuple[str, float, int], tuple[str, float, int]]:
         """Generate both paths under the lock (no adapter-state races across requests).
 
-        Emits per-path child spans (infer.finetuned / infer.base) for the PRD §11.4 trace
-        structure. Latency/token-cost METRICS on these spans are Phase 5.
+        Emits per-path child spans (infer.finetuned / infer.base) with latency + token
+        attributes. Returns (text, latency_ms, n_tokens) per path.
         """
         from trusttrace.observability.otel import get_tracer
 
@@ -91,19 +101,21 @@ class DualClassifier:
         with self._lock:
             with tracer.start_as_current_span("infer.finetuned") as span:
                 span.set_attribute("path", "finetuned")
-                ft_text = self._generate_text(prompt)      # adapter enabled -> fine-tuned
+                ft = self._run_path(prompt, span)          # adapter enabled -> fine-tuned
             with tracer.start_as_current_span("infer.base") as span:
                 span.set_attribute("path", "base")
                 with self.model.disable_adapter():         # base path
-                    base_text = self._generate_text(prompt)
-        return ft_text, base_text
+                    base = self._run_path(prompt, span)
+        return ft, base
 
     def classify(self, text: str) -> DualResult:
-        """Classify one input through both paths; returns parsed structured results."""
+        """Classify one input through both paths; record canary metrics; return results."""
+        from trusttrace.observability import metrics
         from trusttrace.observability.otel import get_tracer
 
         prompt = render_for_inference(self.tokenizer, text, self.max_len)
-        ft_text, base_text = self._infer_both(prompt)
+        (ft_text, ft_ms, ft_tok), (base_text, base_ms, base_tok) = self._infer_both(prompt)
+
         with get_tracer("trusttrace.serving").start_as_current_span("validate.schema") as span:
             result = DualResult(
                 finetuned=parse_classification(ft_text),
@@ -111,6 +123,14 @@ class DualClassifier:
             )
             span.set_attribute("finetuned.schema_valid", result.finetuned.schema_valid)
             span.set_attribute("base.schema_valid", result.base.schema_valid)
+
+        # Custom canary metrics (PRD §11.4) — path + numbers only, no raw text/category.
+        metrics.record_path("finetuned", ft_ms, ft_tok, result.finetuned.schema_valid)
+        metrics.record_path("base", base_ms, base_tok, result.base.schema_valid)
+        metrics.record_quality_delta(
+            (1.0 if result.finetuned.schema_valid else 0.0)
+            - (1.0 if result.base.schema_valid else 0.0)
+        )
         return result
 
 
