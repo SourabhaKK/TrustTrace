@@ -130,6 +130,36 @@ Config lives in `artifacts/signoz/`:
 > during authoring); verify/tweak fields in the UI on import. The metric names + the
 > quality-delta threshold above are the authoritative spec.
 
+### Querying the histogram metrics in SigNoz (known friction + workaround)
+
+The four metrics are OTel **Histograms** exported with **cumulative** temporality. SigNoz
+ingests each one **decomposed** into components — `trusttrace.quality_delta.sum`, `.count`,
+`.bucket` (Histogram), `.min`, `.max` (Gauge) — and does **not** surface a single recomposed
+`trusttrace.quality_delta` you can average directly. So an average (e.g. for `quality_delta`
+or `schema.valid_rate`) must be built as **sum ÷ count**.
+
+**To plot / alert on the average of `trusttrace.quality_delta`:**
+
+- **Simplest:** select `trusttrace.quality_delta.bucket` (Type: Histogram) and set the
+  space aggregation to **Avg** if the version offers it (Avg = sum/count).
+- **Portable (works everywhere) — formula:**
+  - Query **A** = `trusttrace.quality_delta.sum`, aggregate-within = **Rate**, across = **Sum**
+  - Query **B** = `trusttrace.quality_delta.count`, aggregate-within = **Rate**, across = **Sum**
+  - **Formula `A/B`** = average quality_delta over the window (rate() cancels the per-second
+    factor and survives app restarts / counter resets).
+  - Alert condition: **formula `A/B` Below `-0.1`**, at least once over the last **5 min**.
+
+The same `rate(sum)/rate(count)` pattern gives `schema.valid_rate{path}` (filter/group by `path`).
+`inference.latency_ms` and `tokens.total` work the same way (or use the histogram's built-in
+avg/percentiles).
+
+> **Known limitation / future cleanup.** Using cumulative Histograms with default buckets for
+> small-range values (0/1, −1…+1) makes SigNoz's histogram UI awkward (percentile buckets are
+> coarse; no one-click average). It works via the `rate(sum)/rate(count)` formula above. A
+> cleaner future option is to emit these as **delta temporality** (or a purpose-built average
+> series) so SigNoz shows a single directly-plottable metric — deferred; the formula is the
+> current supported path (chosen 2026-07-25).
+
 ### Verifying metrics land (ClickHouse ground-truth)
 
 ```bash

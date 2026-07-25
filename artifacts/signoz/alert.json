@@ -1,4 +1,5 @@
 {
+  "_note": "SigNoz ingests the quality_delta histogram DECOMPOSED (.sum/.count/.bucket/.min/.max); there is no single 'trusttrace.quality_delta' metric to average. Build the average in the UI as a formula A/B where A=rate(trusttrace.quality_delta.sum), B=rate(trusttrace.quality_delta.count), and alert on A/B < -0.10. See docs/observability.md 'Querying the histogram metrics in SigNoz'. The query block below records the INTENT (avg quality_delta).",
   "alert": "TrustTrace canary — fine-tuned quality regression",
   "alertType": "METRIC_BASED_ALERT",
   "description": "Fires when the fine-tuned path's schema-validity drops more than 10 percentage points below the base path's, i.e. avg(trusttrace.quality_delta) over 5m falls below -0.10. Healthy traffic sits near +0.86. (PRD §11.4)",
