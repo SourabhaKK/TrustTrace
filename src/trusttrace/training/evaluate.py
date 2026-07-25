@@ -16,22 +16,20 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import re
 from pathlib import Path
 
 import torch
 from sklearn.metrics import f1_score
 
-from trusttrace.schema import Category, ClassificationOutput
+from trusttrace.parse import parse_classification
+from trusttrace.schema import Category
 from trusttrace.training.dataset import load_split
 from trusttrace.training.prompt import render_for_inference
 from trusttrace.training.train import ADAPTER_DIR, MODEL_ID
 
 log = logging.getLogger(__name__)
 
-_CATEGORY_VALUES = {c.value for c in Category}
 _LABELS = [c.value for c in Category]
-_JSON_RE = re.compile(r"\{[^{}]*\}")
 RESULTS_PATH = Path("artifacts/eval_results.md")
 
 
@@ -55,24 +53,6 @@ def _load_base(model_id: str):
     return model, tok
 
 
-def extract_prediction(text: str) -> tuple[bool, str | None]:
-    """(schema_valid, predicted_category). schema_valid is strict; category is lenient."""
-    m = _JSON_RE.search(text)
-    if not m:
-        return False, None
-    try:
-        obj = json.loads(m.group(0))
-    except (json.JSONDecodeError, ValueError):
-        return False, None
-    schema_valid = True
-    try:
-        ClassificationOutput.model_validate(obj)
-    except Exception:  # noqa: BLE001
-        schema_valid = False
-    cat = obj.get("category") if isinstance(obj, dict) else None
-    return schema_valid, (cat if cat in _CATEGORY_VALUES else None)
-
-
 @torch.no_grad()
 def _generate(model, tokenizer, prompts: list[str], batch_size: int, max_new_tokens: int) -> list[str]:
     outputs: list[str] = []
@@ -89,9 +69,10 @@ def _generate(model, tokenizer, prompts: list[str], batch_size: int, max_new_tok
 
 
 def _metrics(texts: list[str], gold: list[str]) -> dict[str, float]:
-    valids, preds = zip(*(extract_prediction(t) for t in texts))
+    parsed = [parse_classification(t) for t in texts]
+    valids = [r.schema_valid for r in parsed]
     n = len(gold)
-    y_pred = [p if p is not None else "INVALID" for p in preds]
+    y_pred = [r.category if r.category is not None else "INVALID" for r in parsed]
     return {
         "schema_validity": sum(valids) / n,
         "accuracy": sum(p == g for p, g in zip(y_pred, gold)) / n,
