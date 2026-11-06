@@ -83,6 +83,9 @@ def test_both_paths_valid():
 
 
 def test_classify_rejects_empty_text():
+    # Use the stub classifier like the other tests; without it the app lazily loads
+    # the real GPU model, which fails on machines without a GPU (including CI).
+    _use(_valid(Category.NONE), _invalid())
     resp = client.post("/classify", json={"text": ""})
     assert resp.status_code == 422  # pydantic min_length
 
