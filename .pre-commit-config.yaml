@@ -1,0 +1,15 @@
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.28.0
+    hooks:
+      - id: gitleaks
+
+  # Same check as the lint job in .github/workflows/ci.yml
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff check (errors only)
+        entry: ruff check --select E9,F63,F7,F82 .
+        language: system
+        pass_filenames: false
+        types: [python]
