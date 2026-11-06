@@ -12,8 +12,9 @@
 # (See docs/serving.md. The base model is pulled from HF on first request; mount the HF
 # cache to avoid re-downloading.)
 
+# Base image pinned by digest (tag: pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime).
 # ---- Builder: serving deps on top of the CUDA 12.1 / torch 2.5.1 base ----
-FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime AS builder
+FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime@sha256:831247999fbf7e08f61b3e39f6d77ee434f38f6f07f769d00db451e853878067 AS builder
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN python -m venv --system-site-packages /venv
 ENV PATH=/venv/bin:$PATH
@@ -25,7 +26,7 @@ RUN pip install \
     "opentelemetry-instrumentation-fastapi>=0.65b0"
 
 # ---- Runtime ----
-FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime AS runtime
+FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime@sha256:831247999fbf7e08f61b3e39f6d77ee434f38f6f07f769d00db451e853878067 AS runtime
 COPY --from=builder /venv /venv
 ENV PATH=/venv/bin:$PATH \
     PYTHONPATH=/app/src \
