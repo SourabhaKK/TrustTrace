@@ -11,7 +11,7 @@ uvicorn>=0.54.0
 httpx>=0.27
 opentelemetry-sdk>=1.44
 opentelemetry-exporter-otlp>=1.44
-opentelemetry-instrumentation-fastapi>=0.65b0
+opentelemetry-instrumentation-fastapi>=0.66b2
 
 # Fine-tuning (Phase 3) — QLoRA. torch must be a CUDA build (e.g. torch==2.5.1+cu121);
 # install it separately per your CUDA version. bitsandbytes needs an NVIDIA GPU (cc >= 7.5).
