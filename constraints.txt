@@ -1,0 +1,3 @@
+# Used only when regenerating requirements.txt: keeps the resolver on the torch version CI and the
+# Docker image use (torch itself is installed separately, see requirements.in).
+torch==2.5.1
